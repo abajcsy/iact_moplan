@@ -355,9 +355,7 @@ class TrajoptPlanner(planner.Planner):
 			aug_start = np.append(start.reshape(7), np.array([0,0,0]), 1)
 		self.robot.SetDOFValues(aug_start)
 
-		self.num_waypts_plan = 4
-
-		import pdb; pdb.set_trace()		
+		self.num_waypts_plan = 4	
 
 		if self.waypts_plan == None:
 			init_waypts = np.zeros((self.num_waypts_plan,7))
