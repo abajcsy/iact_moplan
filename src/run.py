@@ -6,6 +6,7 @@ import argparse
 import actionlib
 import time
 import planner
+import precomputed_planner
 import trajopt_planner
 import jaco_controller
 
@@ -31,19 +32,25 @@ if __name__ == '__main__':
 	step_time = 0.5
 
 	# ---- default straight-line planner ---- #
-	# planner = planner.Planner()
-	# planner.replan(start, goal, start_time, final_time, step_time)	
+	planner = planner.Planner()
+	planner.replan(start, goal, start_time, final_time, step_time)	
 	# --------------------------------------- #	
 
+	# ---- pre-computed trajectory planner ---- #
+	# traj_filename = "../resources/traj_example.p"
+	# planner = precomputed_planner.PrecomputedPlanner()
+	# planner.replan(None, None, start_time, final_time, step_time, traj_filename)	
+	# ----------------------------------------- #	
+
 	# ---- trajectory optimization planner ---- #
-	features = ["table", "coffee"]
-	planner = trajopt_planner.TrajoptPlanner(features)
+	# features = ["table", "coffee"]
+	# planner = trajopt_planner.TrajoptPlanner(features)
 
 	# specify the features for the cost function and their weighting
-	weights = [1, 0]
+	# weights = [1, 0]
 
 	# plan a trajectory from start to goal, with the feature weight
-	planner.replan(start, goal, start_time, final_time, step_time, weights)		
+	# planner.replan(start, goal, start_time, final_time, step_time, weights)		
 	# ----------------------------------------- #
 	
 	# create the jaco controller

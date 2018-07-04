@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 """
-This codes implements a trajectory-optimization based planner. The underlying
+This code implements a trajectory-optimization based planner. The underlying
 optimization is based on "Finding Locally Optimal, Collision-Free Trajectories 
 with Sequential Convex Optimization" by Schulman, J. et al. 2013.
 
@@ -408,6 +408,7 @@ class TrajoptPlanner(planner.Planner):
 
 		result = trajoptpy.OptimizeProblem(prob)
 		self.waypts_plan = result.GetTraj()
+		print self.waypts_plan
 		self.step_time_plan = (self.final_time - self.start_time)/(self.num_waypts_plan - 1)
 
 	# ---- replanning ---- #
