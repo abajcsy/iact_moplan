@@ -32,7 +32,8 @@ if __name__ == '__main__':
 
 	# ---- default straight-line planner ---- #
 	# planner = planner.Planner()
-	# planner.replan(start, goal, start_time, final_time, step_time)		
+	# planner.replan(start, goal, start_time, final_time, step_time)	
+	# --------------------------------------- #	
 
 	# ---- trajectory optimization planner ---- #
 	features = ["table", "coffee"]
@@ -43,6 +44,7 @@ if __name__ == '__main__':
 
 	# plan a trajectory from start to goal, with the feature weight
 	planner.replan(start, goal, start_time, final_time, step_time, weights)		
+	# ----------------------------------------- #
 	
 	# create the jaco controller
 	sim_flag = True
