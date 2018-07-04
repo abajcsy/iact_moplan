@@ -14,6 +14,7 @@ import or_trajopt
 import openravepy
 from openravepy import *
 
+import planner
 import openrave_utils
 from openrave_utils import *
 
@@ -23,25 +24,30 @@ import copy
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
 
-class TrajoptPlanner(Planner):
+feature_options = ["table", "coffee", "human", "laptop", "origin"]
+
+class TrajoptPlanner(planner.Planner):
 	"""
 	This class plans a trajectory from start to goal 
 	with TrajOpt. 
 	"""
 
-	def __init__(self):
+	def __init__(self, features):
 
 		# ---- important internal variables ---- #
-		Planner.__init__(self)
+		super(TrajoptPlanner, self).__init__()
 
-		self.weights = 1
+		self.weights = [None]*len(features)
 		self.waypts_prev = None
+
+		# list of features to consider
+		self.features = features
 
 		# ---- OpenRAVE Initialization ---- #
 		
 		# initialize robot and empty environment
 		model_filename = 'jaco_dynamics'
-		self.env, self.robot = initialize(model_filename)
+		self.env, self.robot = initialize(model_filename, visualize=False)
 
 		# insert any objects you want into environment
 		self.bodies = []
@@ -59,12 +65,26 @@ class TrajoptPlanner(Planner):
 		---
 		input trajectory, output list of feature values
 		"""
-		features = [None,None]
-		features[0] = self.velocity_features(waypts)
-		features[1] = [0.0]*(len(waypts)-1)
-		for index in range(0,len(waypts)-1):
-			features[1][index] = self.table_features(waypts[index+1])
-		return features
+		# always include velocity feature + custom features
+		curr_features = [None]*(len(self.features)+1)
+		curr_features[0] = self.velocity_features(waypts)
+		idx = 1
+		for feat in self.features:
+			curr_features[idx] = [0.0]*(len(waypts)-1)
+			for waypt_idx in range(0,len(waypts)-1):
+				if feat is "table":
+					curr_features[idx][waypt_idx] = self.table_features(waypts[waypt_idx+1])
+				if feat is "coffee":
+					curr_features[idx][waypt_idx] = self.coffee_features(waypts[waypt_idx+1])
+				if feat is "human":
+					curr_features[idx][waypt_idx] = self.human_features(waypts[waypt_idx+1], waypts[waypt_idx])
+				if feat is "laptop":
+					curr_features[idx][waypt_idx] = self.laptop_features(waypts[waypt_idx+1], waypts[waypt_idx])
+				if feat is "origin":
+					curr_features[idx][waypt_idx] = self.origin_features(waypts[waypt_idx+1])
+			idx += 1
+
+		return curr_features
 
 	# -- Velocity -- #
 
@@ -90,6 +110,35 @@ class TrajoptPlanner(Planner):
 		#mywaypts = np.reshape(waypts,(7,self.num_waypts_plan)).T
 		return self.velocity_features(mywaypts)
 
+	# -- Distance to Robot Base (origin of world) -- #
+
+	def origin_features(self, waypt):
+		"""
+		Computes the total cost over waypoints based on 
+		y-axis distance to table
+		---
+		input trajectory, output scalar feature
+		"""
+		if len(waypt) < 10:
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt[2] += math.pi
+		self.robot.SetDOFValues(waypt)
+		coords = robotToCartesian(self.robot)
+		EEcoord_y = coords[6][1]
+		EEcoord_y = np.linalg.norm(coords[6])
+		print "EEcoord_y: " + str(EEcoord_y)
+		return EEcoord_y
+	
+	def origin_cost(self, waypt):
+		"""
+		Computes the total distance from EE to base of robot cost.
+		---
+		input trajectory, output scalar cost
+		"""
+		feature = self.origin_features(waypt)
+		weight_idx = self.features.index("origin")
+		return feature*self.weights[weight_idx]										
+
 	# -- Distance to Table -- #
 
 	def table_features(self, waypt):
@@ -114,7 +163,129 @@ class TrajoptPlanner(Planner):
 		input trajectory, output scalar cost
 		"""
 		feature = self.table_features(waypt)
-		return feature*self.weights
+		weight_idx = self.features.index("table")
+		return feature*self.weights[weight_idx]
+
+	# -- Coffee (or z-orientation of end-effector) -- #
+
+	def coffee_features(self, waypt):
+		"""
+		Computes the distance to table cost for waypoint
+		by checking if the EE is oriented vertically.
+		Note: [0,0,1] in the first *column* corresponds to the cup upright
+		---
+		input trajectory, output scalar cost
+		"""
+		if len(waypt) < 10:
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt[2] += math.pi
+		self.robot.SetDOFValues(waypt)
+		EE_link = self.robot.GetLinks()[7]
+		return sum(abs(EE_link.GetTransform()[:2,:3].dot([1,0,0])))
+		
+	def coffee_cost(self, waypt):
+		"""
+		Computes the total coffee (EE orientation) cost.
+		---
+		input trajectory, output scalar cost
+		"""
+		feature = self.coffee_features(waypt)
+		weight_idx = self.features.index("coffee")
+		return feature*self.weights[weight_idx]
+
+	# -- Distance to Laptop -- #
+
+	def laptop_features(self, waypt, prev_waypt):
+		"""
+		Computes laptop cost over waypoints, interpolating and
+		sampling between each pair to check for intermediate collisions
+		---
+		input trajectory, output scalar feature
+		"""
+		feature = 0.0
+		NUM_STEPS = 4
+		for step in range(NUM_STEPS):
+			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
+			feature += self.laptop_dist(inter_waypt)
+		return feature
+
+	def laptop_dist(self, waypt):
+		"""
+		Computes distance from end-effector to laptop in xy coords
+		input trajectory, output scalar distance where 
+			0: EE is at more than 0.4 meters away from laptop
+			+: EE is closer than 0.4 meters to laptop
+		"""
+		if len(waypt) < 10:
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt[2] += math.pi
+		self.robot.SetDOFValues(waypt)
+		coords = robotToCartesian(self.robot)
+		EE_coord_xy = coords[6][0:2]
+		laptop_xy = np.array(OBS_CENTER[0:2])
+		dist = np.linalg.norm(EE_coord_xy - laptop_xy) - 0.4
+		if dist > 0:
+			return 0
+		return -dist
+
+	def laptop_cost(self, waypt):
+		"""
+		Computes the total distance to laptop cost
+		---
+		input trajectory, output scalar cost
+		"""
+		prev_waypt = waypt[0:7]
+		curr_waypt = waypt[7:14]
+		feature = self.laptop_features(curr_waypt,prev_waypt)
+		weight_idx = self.features.index("laptop")
+		return feature*self.weights[weight_idx]*np.linalg.norm(curr_waypt - prev_waypt)
+
+	# -- Distance to Human -- #
+
+	def human_features(self, waypt, prev_waypt):
+		"""
+		Computes laptop cost over waypoints, interpolating and
+		sampling between each pair to check for intermediate collisions
+		---
+		input trajectory, output scalar feature
+		"""
+		feature = 0.0
+		NUM_STEPS = 4
+		for step in range(NUM_STEPS):
+			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
+			feature += self.human_dist(inter_waypt)
+		return feature
+
+	def human_dist(self, waypt):
+		"""
+		Computes distance from end-effector to human in xy coords
+		input trajectory, output scalar distance where 
+			0: EE is at more than 0.4 meters away from human
+			+: EE is closer than 0.4 meters to human
+		"""
+		if len(waypt) < 10:
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt[2] += math.pi
+		self.robot.SetDOFValues(waypt)
+		coords = robotToCartesian(self.robot)
+		EE_coord_xy = coords[6][0:2]
+		human_xy = np.array(HUMAN_CENTER[0:2])
+		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.4
+		if dist > 0:
+			return 0
+		return -dist
+
+	def human_cost(self, waypt):
+		"""
+		Computes the total distance to laptop cost
+		---
+		input trajectory, output scalar cost
+		"""
+		prev_waypt = waypt[0:7]
+		curr_waypt = waypt[7:14]
+		feature = self.human_features(curr_waypt,prev_waypt)
+		weight_idx = self.features.index("human")
+		return feature*self.weights[weight_idx]*np.linalg.norm(curr_waypt - prev_waypt)				
 
 	# ---- custom constraints --- #
 
@@ -133,6 +304,30 @@ class TrajoptPlanner(Planner):
 			EE_coord_z = 0
 		return -EE_coord_z
 
+	def coffee_constraint(self, waypt):
+		"""
+		Constrains orientation of robot's end-effector to be 
+		holding coffee mug upright.
+		"""
+		if len(waypt) < 10:
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt[2] += math.pi
+		self.robot.SetDOFValues(waypt)
+		EE_link = self.robot.GetLinks()[7]
+		return EE_link.GetTransform()[:2,:3].dot([1,0,0])
+
+		
+	def coffee_constraint_derivative(self, waypt):
+		"""
+		Analytic derivative for coffee constraint.
+		"""
+		if len(waypt) < 10:
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt[2] += math.pi
+		self.robot.SetDOFValues(waypt)
+		world_dir = self.robot.GetLinks()[7].GetTransform()[:3,:3].dot([1,0,0])
+		return np.array([np.cross(self.robot.GetJoints()[i].GetAxis(), world_dir)[:2] for i in range(7)]).T.copy()
+
 	# ---- here's trajOpt --- #
 		
 	def trajOpt(self, start, goal):
@@ -147,6 +342,9 @@ class TrajoptPlanner(Planner):
 		self.robot.SetDOFValues(aug_start)
 
 		self.num_waypts_plan = 4
+
+		import pdb; pdb.set_trace()		
+
 		if self.waypts_plan == None:
 			init_waypts = np.zeros((self.num_waypts_plan,7))
 			for count in range(self.num_waypts_plan):
@@ -182,7 +380,16 @@ class TrajoptPlanner(Planner):
 		prob = trajoptpy.ConstructProblem(s, self.env)
 
 		for t in range(1,self.num_waypts_plan): 
-			prob.AddCost(self.table_cost, [(t,j) for j in range(7)], "table%i"%t)
+			if "table" in self.features:
+				prob.AddCost(self.table_cost, [(t,j) for j in range(7)], "table%i"%t)
+			if "coffee" in self.features:
+				prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
+			if "laptop" in self.features:
+				prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
+			if "human" in self.features:
+				prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
+			if "origin" in self.features:
+				prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
 
 		for t in range(1,self.num_waypts_plan - 1):
 			prob.AddConstraint(self.table_constraint, [(t,j) for j in range(7)], "INEQ", "up%i"%t)

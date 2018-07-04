@@ -13,7 +13,7 @@ logging.getLogger('prpy.planning.base').addHandler(logging.NullHandler())
 
 robot_starting_dofs = np.array([-1, 2, 0, 2, 0, 4, 0, 1.11022302e-16,  -1.11022302e-16, 3.33066907e-16])
 
-def initialize(model_filename='jaco_dynamics', envXML=None):
+def initialize(model_filename='jaco_dynamics', visualize=True, envXML=None):
 	'''
 	Load and configure the JACO robot. If envXML is not None, loads environment.
 	Returns robot and environment.
@@ -26,7 +26,8 @@ def initialize(model_filename='jaco_dynamics', envXML=None):
 	env = openravepy.Environment()
 	if envXML is not None:
 		env.LoadURI(envXML)
-	env.SetViewer('qtcoin')
+	if visualize:
+		env.SetViewer('qtcoin')
 
 	here = os.path.dirname(os.path.realpath(__file__))
 	urdf_uri = '../resources/'+model_filename+'.urdf'
@@ -52,13 +53,14 @@ robot_name))
 	robot.SetActiveDOFs(np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
 	robot.SetDOFValues(robot_starting_dofs)
 
-	viewer = env.GetViewer()
-	viewer.SetSize(700,500)
-	cam_params = np.array([[-0.99885711, -0.01248719, -0.0461361 , -0.18887213],
-		   [ 0.02495645,  0.68697757, -0.72624996,  2.04733515],
-		   [ 0.04076329, -0.72657133, -0.68588079,  1.67818344],
-		   [ 0.        ,  0.        ,  0.        ,  1.        ]])
-	viewer.SetCamera(cam_params)
+	if visualize:
+		viewer = env.GetViewer()
+		viewer.SetSize(700,500)
+		cam_params = np.array([[-0.99885711, -0.01248719, -0.0461361 , -0.18887213],
+				 [ 0.02495645,  0.68697757, -0.72624996,  2.04733515],
+				 [ 0.04076329, -0.72657133, -0.68588079,  1.67818344],
+				 [ 0.        ,  0.        ,  0.        ,  1.        ]])
+		viewer.SetCamera(cam_params)
 
 	return env, robot
 

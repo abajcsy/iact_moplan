@@ -25,23 +25,25 @@ if __name__ == '__main__':
 	start = np.array(pick)*(math.pi/180.0)
 	goal = np.array(place)*(math.pi/180.0)
 
-	# create the trajectory optimization-based planner
-	# planner = trajopt_planner.TrajoptPlanner()
-	planner = planner.Planner()
- 
-	# max table weight = 0, which means robot will prioritize staying close to the table
-	# See what happens when you change it to 1!
-	# table_weight = 0
-	
 	# set the start time of the traj, final time and step time (in seconds)
 	start_time = 0.0
 	final_time = 15.0
 	step_time = 0.5
 
-	# plan a trajectory from start to goal, with the feature weight
-	# planner.replan(start, goal, start_time, final_time, step_time, table_weight)		
-	planner.replan(start, goal, start_time, final_time, step_time)		
+	# ---- default straight-line planner ---- #
+	# planner = planner.Planner()
+	# planner.replan(start, goal, start_time, final_time, step_time)		
 
+	# ---- trajectory optimization planner ---- #
+	features = ["table", "coffee"]
+	planner = trajopt_planner.TrajoptPlanner(features)
+
+	# specify the features for the cost function and their weighting
+	weights = [1, 0]
+
+	# plan a trajectory from start to goal, with the feature weight
+	planner.replan(start, goal, start_time, final_time, step_time, weights)		
+	
 	# create the jaco controller
 	sim_flag = True
 	admittance_flag = False

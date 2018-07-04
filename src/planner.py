@@ -15,7 +15,7 @@ class Planner(object):
 
 		# these variables are for trajopt
 		self.waypts_plan = None
-		self.num_waypts_plan = 2 	# straight-line traj is default
+		self.num_waypts_plan = None
 		self.step_time_plan = None
 
 		# these variables are for the upsampled trajectory
@@ -38,6 +38,7 @@ class Planner(object):
 		self.start_time = start_time
 		self.final_time = final_time
 		self.curr_waypt_idx = 0
+		self.num_waypts_plan = 2 	# straight-line traj is default
 		self.waypts_plan = [start, goal]
 		self.step_time_plan	= (self.final_time - self.start_time)/(self.num_waypts_plan - 1)	
 		self.upsample(step_time)
