@@ -1,10 +1,10 @@
+#! /usr/bin/env python
 import numpy as np
 import math
 
-
 class Planner(object):
 	"""
-	Base planner class.
+	Base planner class. 
 	"""
 
 	def __init__(self):

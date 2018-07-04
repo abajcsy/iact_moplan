@@ -1,10 +1,8 @@
 #! /usr/bin/env python
 """
-This node demonstrates velocity-based PID control by moving the Jaco
-so that it maintains a fixed distance to a target. 
+This codes implements ROS and OpenRAVE trajectory tracking for the Jaco2 7DOF robot.
 
-Author: Andrea Bajcsy (abajcsy@eecs.berkeley.edu)
-Based on: https://w3.cs.jmu.edu/spragunr/CS354_S15/labs/pid_lab/pid_lab.shtml
+Author: Andrea Bajcsy (abajcsy@berkeley.edu)
 """
 import roslib; roslib.load_manifest('kinova_demo')
 

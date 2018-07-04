@@ -1,3 +1,13 @@
+#! /usr/bin/env python
+"""
+This codes implements a trajectory-optimization based planner. The underlying
+optimization is based on "Finding Locally Optimal, Collision-Free Trajectories 
+with Sequential Convex Optimization" by Schulman, J. et al. 2013.
+
+TrajOpt code: http://rll.berkeley.edu/trajopt/doc/sphinx_build/html/
+
+Author: Andrea Bajcsy (abajcsy@berkeley.edu)
+"""
 import numpy as np
 from numpy import linalg
 from numpy import linspace
@@ -24,7 +34,7 @@ import copy
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
 
-feature_options = ["table", "coffee", "human", "laptop", "origin"]
+FEATURE_OPTIONS = ["table", "coffee", "human", "laptop", "origin"]
 
 class TrajoptPlanner(planner.Planner):
 	"""
@@ -40,6 +50,10 @@ class TrajoptPlanner(planner.Planner):
 		self.weights = [None]*len(features)
 		self.waypts_prev = None
 
+		for feat in features:
+			if feat not in FEATURE_OPTIONS:
+				raise ValueError(feat + " is not a valid feature.")
+				
 		# list of features to consider
 		self.features = features
 
