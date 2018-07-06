@@ -43,3 +43,4 @@ roslaunch kinova_bringup kinova_robot.launch kinova_robotType:=j2s7s300 use_urdf
 * Planner - base planner class with simple straight-line plan 
 * TrajoptPlanner - optimizes a cost that is represented as a linear combination of various features
 * PrecomputedPlanner - reads a sequence of waypoints from a pickle file for the robot to execute
+* PHRIPlanner - optimizes a cost to plan a trajectory. Learns the cost function weights from physical interaction
