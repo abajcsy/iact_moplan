@@ -15,8 +15,8 @@ import thread
 import argparse
 import actionlib
 import time
-import trajopt_planner
 import ros_utils
+import phri_planner
 
 import openravepy
 from openravepy import *
@@ -43,6 +43,7 @@ place_lower = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]
 
 epsilon = 0.10
 MAX_CMD_TORQUE = 40.0
+INTERACTION_TORQUE_THRESHOLD = 8.0
 
 class JacoController(object): 
 	"""
@@ -134,7 +135,7 @@ class JacoController(object):
 
 		# ---- ROS Setup ---- #
 
-		rospy.init_node("pid_trajopt")
+		rospy.init_node("jaco_controller")
 
 		# create joint-velocity publisher
 		self.vel_pub = rospy.Publisher(prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
@@ -229,6 +230,30 @@ class JacoController(object):
 		"""
 		# read the current joint torques from the robot
 		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
+
+		planner_type = type(self.planner)
+
+		# if using the phri_planner, then learn from measured joint torques
+		if planner_type is phri_planner.PHRIPlanner:
+			interaction = False
+			for i in range(7):
+				THRESHOLD = INTERACTION_TORQUE_THRESHOLD
+				if self.reached_start and i == 3:
+					THRESHOLD = 2.0
+				if self.reached_start and i > 3:
+					THRESHOLD = 2.0
+				if np.fabs(torque_curr[i][0]) > THRESHOLD:
+					interaction = True
+				else:
+					# zero out torques below threshold for cleanliness
+					torque_curr[i][0] = 0.0
+
+			# if experienced large enough interaction force, then deform traj
+			if interaction:
+				print "--- INTERACTION ---"
+				print "u_h: " + str(torque_curr)
+
+				self.planner.learn_weights(torque_curr)
 
 	def joint_angles_callback(self, msg):
 		"""

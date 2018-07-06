@@ -8,6 +8,7 @@ import time
 import planner
 import precomputed_planner
 import trajopt_planner
+import phri_planner
 import jaco_controller
 
 import numpy as np
@@ -53,6 +54,12 @@ if __name__ == '__main__':
 	# planner.replan(start, goal, start_time, final_time, step_time, weights)		
 	# ----------------------------------------- #
 	
+	# --- learning from pHRI planner ---- # 
+	# features = ["table", "coffee"]
+	# planner = phri_planner.PHRIPlanner(features)
+	# weights = [0, 0]
+	# planner.replan(start, goal, start_time, final_time, step_time, weights)		
+
 	# create the jaco controller
 	sim_flag = True
 	admittance_flag = False
