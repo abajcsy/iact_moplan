@@ -2,9 +2,9 @@
 
 Motion planning and control functionality for the InterACT Lab. This code is primarily used for the JACO2 7DOF robotic arm and implements the basic functionality of:
 * ROS interface to read joint positions and sensor messages and command joint velocities
-* OpenRAVE simulation and forward/inverse kinematics 
+* OpenRAVE integration for simulation and forward/inverse kinematics 
 * Trajectory planning from a start to a goal configuration 
-* PID control around a pre-planned trajectory
+* PID and Admittance control around a pre-planned trajectory
 
 ## Dependencies
 * Ubuntu 14.04, ROS Indigo, OpenRAVE, Python 2.7
