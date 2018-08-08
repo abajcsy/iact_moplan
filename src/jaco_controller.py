@@ -38,9 +38,6 @@ import matplotlib.pyplot as plt
 
 prefix = 'j2s7s300_driver'
 
-pick_basic = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
-place_lower = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]
-
 epsilon = 0.10
 MAX_CMD_TORQUE = 40.0
 INTERACTION_TORQUE_THRESHOLD = 8.0
@@ -228,32 +225,37 @@ class JacoController(object):
 		"""
 		Reads the latest torque sensed by the robot 
 		"""
-		# read the current joint torques from the robot
-		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
+		if self.reached_start:
+			# read the current joint torques from the robot
+			torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
-		planner_type = type(self.planner)
+			planner_type = type(self.planner)
 
-		# if using the phri_planner, then learn from measured joint torques
-		if planner_type is phri_planner.PHRIPlanner:
-			interaction = False
-			for i in range(7):
-				THRESHOLD = INTERACTION_TORQUE_THRESHOLD
-				if self.reached_start and i == 3:
-					THRESHOLD = 2.0
-				if self.reached_start and i > 3:
-					THRESHOLD = 2.0
-				if np.fabs(torque_curr[i][0]) > THRESHOLD:
-					interaction = True
-				else:
-					# zero out torques below threshold for cleanliness
-					torque_curr[i][0] = 0.0
+			# if using the phri_planner, then learn from measured joint torques
+			if planner_type is phri_planner.PHRIPlanner:
+				interaction = False
+				for i in range(7):
+					THRESHOLD = INTERACTION_TORQUE_THRESHOLD
+					if i == 1:
+						THRESHOLD = 22.0
+					if i == 3:
+						THRESHOLD = 8.0
+					if i > 3:
+						THRESHOLD = 8.0
+					if i == 6:
+						THRESHOLD = 2.0
+					if np.fabs(torque_curr[i][0]) > THRESHOLD:
+						interaction = True
+					else:
+						# zero out torques below threshold for cleanliness
+						torque_curr[i][0] = 0.0
 
-			# if experienced large enough interaction force, then deform traj
-			if interaction:
-				print "--- INTERACTION ---"
-				print "u_h: " + str(torque_curr)
+				# if experienced large enough interaction force, then deform traj
+				if interaction:
+					print "--- INTERACTION ---"
+					print "u_h: " + str(torque_curr)
 
-				self.planner.learn_weights(torque_curr)
+					self.planner.learn_weights(torque_curr)
 
 	def joint_angles_callback(self, msg):
 		"""
